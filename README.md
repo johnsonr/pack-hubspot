@@ -31,18 +31,38 @@ Methods land under `gateway.hubspot`. E.g.:
 
 See `prompts/examples.md` for usage patterns.
 
-## Auth
+## Auth — OAuth2 (no token paste)
 
-HubSpot Private Apps are the easiest path. In your HubSpot account:
+This pack uses HubSpot's OAuth2 Public App flow. The user clicks
+**Authorize** in Settings → Connected Services and gets bounced through
+HubSpot's consent screen — no copy/paste of API tokens.
 
-1. Settings → Integrations → Private Apps → Create a private app.
-2. Under **Scopes**, enable: `crm.objects.contacts.read/write`,
-   `crm.objects.companies.read/write`, `crm.objects.deals.read/write`,
-   `crm.objects.owners.read`, plus tickets / pipelines as needed.
-3. Copy the access token.
-4. Set it in the credential store or env: `HUBSPOT_PRIVATE_APP_TOKEN=pat-na1-...`
+One-time setup per assistant installation:
 
-The token is sent as `Authorization: Bearer <token>`.
+1. **Create a HubSpot Public App** at
+   `app.hubspot.com/developer/<hubid>/applications`.
+2. **Scopes** — enable at least:
+   `crm.objects.contacts.read crm.objects.contacts.write`
+   `crm.objects.companies.read crm.objects.companies.write`
+   `crm.objects.deals.read crm.objects.deals.write`
+   `crm.objects.owners.read tickets`
+   (Pare back to read-only if the assistant should only browse.)
+3. **Redirect URI** — set to your assistant's callback:
+   `http://localhost:8042/api/v1/auth/oauth2/callback`
+   (or your deployed host's URL).
+4. **Copy** the app's client ID and client secret.
+5. **Tell the assistant** by typing in chat (intercepted, never sent to
+   the LLM):
+   ```
+   set HUBSPOT_CLIENT_ID = <your-client-id>
+   set HUBSPOT_CLIENT_SECRET = <your-client-secret>
+   ```
+6. Open **Settings → Connected Services** in the assistant and click
+   **Authorize** on the `hubspot` row. After consent the row shows
+   "Connected `<your-hub-domain>`" and `gateway.hubspot.*` is live.
+
+Token refresh is automatic. Disconnect any time from the same Settings
+panel.
 
 ## Object types covered
 

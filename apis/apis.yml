@@ -1,4 +1,4 @@
-# HubSpot CRM v3 — vendored OpenAPI spec.
+# HubSpot CRM v3 — vendored OpenAPI spec, OAuth2-authenticated.
 #
 # HubSpot no longer publishes per-API OpenAPI specs at a stable public
 # URL (the old `api-catalog-public/v1/apis/...` endpoints all 404 as of
@@ -13,11 +13,48 @@
 # path, give it a unique operationId, and (optionally) add it to the
 # operationIds allowlist below if you want to gate exposure.
 #
-# Auth: Private App access token (Settings → Integrations → Private Apps
-# in the HubSpot UI). Set HUBSPOT_PRIVATE_APP_TOKEN in the credential
-# store or environment. Bearer auth.
+# Auth: OAuth2 against a HubSpot Public App. Per-installation client_id
+# and client_secret are pulled from env vars (or workspace secrets) via
+# `${VAR}` expansion — the pack repo never holds real credentials.
+#
+# To set up:
+#   1. In your HubSpot developer portal create a Public App.
+#      app.hubspot.com/developer/<hubid>/applications
+#   2. Add scopes: crm.objects.contacts.read crm.objects.contacts.write
+#      crm.objects.companies.read crm.objects.companies.write
+#      crm.objects.deals.read crm.objects.deals.write
+#      crm.objects.owners.read tickets
+#      (start with the read-only set if you only want browsing)
+#   3. Set the redirect URI to your assistant's:
+#      http://localhost:8042/api/v1/auth/oauth2/callback
+#      (or your deployed host)
+#   4. Copy the app's client ID and client secret.
+#   5. Set them as workspace secrets in chat:
+#      set HUBSPOT_CLIENT_ID = your-client-id
+#      set HUBSPOT_CLIENT_SECRET = your-client-secret
+#   6. Open Settings → Connected Services and click "Authorize" on hubspot.
+#
+# The `identity:` block tells the assistant how to pull the connecting
+# HubSpot account's hub_id + domain out of HubSpot's introspection
+# endpoint, so the UI can show "Connected as acme.com" rather than just
+# "Connected". Pure config — no Kotlin per pack.
 - url: hubspot-crm.json
   name: hubspot
   type: openapi
-  auth: bearer
-  token-env: HUBSPOT_PRIVATE_APP_TOKEN
+  auth: oauth2
+  oauth2:
+    client-id: ${HUBSPOT_CLIENT_ID}
+    client-secret: ${HUBSPOT_CLIENT_SECRET}
+    auth-url: https://app.hubspot.com/oauth/authorize
+    token-url: https://api.hubapi.com/oauth/v1/token
+    scopes: >-
+      crm.objects.contacts.read crm.objects.contacts.write
+      crm.objects.companies.read crm.objects.companies.write
+      crm.objects.deals.read crm.objects.deals.write
+      crm.objects.owners.read tickets
+    identity:
+      url: https://api.hubapi.com/oauth/v1/access-tokens/{token}
+      method: GET
+      auth: path-token
+      account-id-field: hub_id
+      display-name-field: hub_domain
