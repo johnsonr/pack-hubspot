@@ -51,9 +51,10 @@ website you've ever used.
 If the row shows **"Not configured"**, the deployment operator hasn't
 registered the HubSpot app yet — show them the next section.
 
-### For operators (one-time deployment setup)
+### For installation admins (one-time setup)
 
-You only do this once per deployment, no matter how many end users join.
+Done once per installation. Every workspace in the installation
+inherits — end users just click Authorize.
 
 1. **Create a HubSpot Public App** at
    `app.hubspot.com/developer/<your-hubid>/applications`.
@@ -64,30 +65,31 @@ You only do this once per deployment, no matter how many end users join.
    crm.objects.deals.read      crm.objects.deals.write
    crm.objects.owners.read     tickets
    ```
-   Pare back to read-only if the deployment should only browse, never
-   write.
+   Pare back to read-only if the installation should only browse,
+   never write.
 3. **Redirect URI** — set to your assistant's public callback URL:
    `https://your-host/api/v1/auth/oauth2/callback`
-   (or `http://localhost:8042/api/v1/auth/oauth2/callback` for local dev).
+   (or `http://localhost:8042/api/v1/auth/oauth2/callback` for local
+   dev).
 4. **Copy** the app's client ID and client secret.
-5. **Add them to the deployment's `application.yml`** (or env vars —
-   Spring relaxed binding):
+5. **Add them to** `{workspaceBase}/admin/oauth-apps.yml` (the same
+   admin directory that holds `pack-sources.yml`, `themes/`, `hints/`,
+   etc.):
 
    ```yaml
-   assistant:
-     oauth:
-       apps:
-         hubspot:
-           client-id: 12345-abcdef-...
-           client-secret: secret-blah
+   apps:
+     hubspot:
+       client-id: 12345-abcdef-...
+       client-secret: secret-blah
    ```
 
-   Or:
-   ```bash
-   ASSISTANT_OAUTH_APPS_HUBSPOT_CLIENT_ID=...
-   ASSISTANT_OAUTH_APPS_HUBSPOT_CLIENT_SECRET=...
-   ```
-6. Restart the deployment. Every end user can now click Authorize.
+   Hot-reloaded — no restart needed. Every workspace in the
+   installation will see "Authorize" appear in Settings.
+
+A specific workspace can opt out of the installation default and
+point at its own HubSpot app by writing the same shape to
+`<workspace>/config/oauth-apps.yml` — useful if one team needs a
+different brand on the consent screen.
 
 Token refresh is automatic. End users can disconnect from the same
 Settings panel any time.
