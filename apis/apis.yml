@@ -9,42 +9,21 @@
 # (`contacts | companies | deals | tickets`) so the surface stays small
 # while coverage stays wide.
 #
-# To extend: add an operation to hubspot-crm.json under the relevant
-# path, give it a unique operationId, and (optionally) add it to the
-# operationIds allowlist below if you want to gate exposure.
+# Auth: OAuth2 against a HubSpot Public App registered ONCE per
+# assistant deployment. Client credentials live in the deployment's
+# `application.yml` under `assistant.oauth.apps.hubspot.*` — NEVER in
+# this file (which is checked into the public pack repo) and NEVER in
+# any end user's workspace. End users just click "Authorize" in
+# Settings → Connected Services.
 #
-# Auth: OAuth2 against a HubSpot Public App. Per-installation client_id
-# and client_secret are pulled from env vars (or workspace secrets) via
-# `${VAR}` expansion — the pack repo never holds real credentials.
-#
-# To set up:
-#   1. In your HubSpot developer portal create a Public App.
-#      app.hubspot.com/developer/<hubid>/applications
-#   2. Add scopes: crm.objects.contacts.read crm.objects.contacts.write
-#      crm.objects.companies.read crm.objects.companies.write
-#      crm.objects.deals.read crm.objects.deals.write
-#      crm.objects.owners.read tickets
-#      (start with the read-only set if you only want browsing)
-#   3. Set the redirect URI to your assistant's:
-#      http://localhost:8042/api/v1/auth/oauth2/callback
-#      (or your deployed host)
-#   4. Copy the app's client ID and client secret.
-#   5. Set them as workspace secrets in chat:
-#      set HUBSPOT_CLIENT_ID = your-client-id
-#      set HUBSPOT_CLIENT_SECRET = your-client-secret
-#   6. Open Settings → Connected Services and click "Authorize" on hubspot.
-#
-# The `identity:` block tells the assistant how to pull the connecting
-# HubSpot account's hub_id + domain out of HubSpot's introspection
-# endpoint, so the UI can show "Connected as acme.com" rather than just
-# "Connected". Pure config — no Kotlin per pack.
+# The `identity:` block is a HubSpot fact (every install talks to the
+# same introspection endpoint) so it stays here. Same for `auth-url`,
+# `token-url`, `scopes`.
 - url: hubspot-crm.json
   name: hubspot
   type: openapi
   auth: oauth2
   oauth2:
-    client-id: ${HUBSPOT_CLIENT_ID}
-    client-secret: ${HUBSPOT_CLIENT_SECRET}
     auth-url: https://app.hubspot.com/oauth/authorize
     token-url: https://api.hubapi.com/oauth/v1/token
     scopes: >-

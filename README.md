@@ -31,38 +31,66 @@ Methods land under `gateway.hubspot`. E.g.:
 
 See `prompts/examples.md` for usage patterns.
 
-## Auth — OAuth2 (no token paste)
+## Auth — OAuth2
 
-This pack uses HubSpot's OAuth2 Public App flow. The user clicks
-**Authorize** in Settings → Connected Services and gets bounced through
-HubSpot's consent screen — no copy/paste of API tokens.
+End users **never** paste API tokens, never know about client IDs, and
+never set environment variables. They click **Authorize** in
+Settings → Connected Services. That's it.
 
-One-time setup per assistant installation:
+This works because the assistant deployment has ONE registered HubSpot
+Public App. Every end user connects their own HubSpot account against
+that single app — same as how "Login with Google" works on every
+website you've ever used.
+
+### For end users
+
+1. Open **Settings → Connected Services**.
+2. Click **Authorize** on the `hubspot` row.
+3. Consent on HubSpot's page. Done — `gateway.hubspot.*` is live in chat.
+
+If the row shows **"Not configured"**, the deployment operator hasn't
+registered the HubSpot app yet — show them the next section.
+
+### For operators (one-time deployment setup)
+
+You only do this once per deployment, no matter how many end users join.
 
 1. **Create a HubSpot Public App** at
-   `app.hubspot.com/developer/<hubid>/applications`.
+   `app.hubspot.com/developer/<your-hubid>/applications`.
 2. **Scopes** — enable at least:
-   `crm.objects.contacts.read crm.objects.contacts.write`
-   `crm.objects.companies.read crm.objects.companies.write`
-   `crm.objects.deals.read crm.objects.deals.write`
-   `crm.objects.owners.read tickets`
-   (Pare back to read-only if the assistant should only browse.)
-3. **Redirect URI** — set to your assistant's callback:
-   `http://localhost:8042/api/v1/auth/oauth2/callback`
-   (or your deployed host's URL).
+   ```
+   crm.objects.contacts.read   crm.objects.contacts.write
+   crm.objects.companies.read  crm.objects.companies.write
+   crm.objects.deals.read      crm.objects.deals.write
+   crm.objects.owners.read     tickets
+   ```
+   Pare back to read-only if the deployment should only browse, never
+   write.
+3. **Redirect URI** — set to your assistant's public callback URL:
+   `https://your-host/api/v1/auth/oauth2/callback`
+   (or `http://localhost:8042/api/v1/auth/oauth2/callback` for local dev).
 4. **Copy** the app's client ID and client secret.
-5. **Tell the assistant** by typing in chat (intercepted, never sent to
-   the LLM):
-   ```
-   set HUBSPOT_CLIENT_ID = <your-client-id>
-   set HUBSPOT_CLIENT_SECRET = <your-client-secret>
-   ```
-6. Open **Settings → Connected Services** in the assistant and click
-   **Authorize** on the `hubspot` row. After consent the row shows
-   "Connected `<your-hub-domain>`" and `gateway.hubspot.*` is live.
+5. **Add them to the deployment's `application.yml`** (or env vars —
+   Spring relaxed binding):
 
-Token refresh is automatic. Disconnect any time from the same Settings
-panel.
+   ```yaml
+   assistant:
+     oauth:
+       apps:
+         hubspot:
+           client-id: 12345-abcdef-...
+           client-secret: secret-blah
+   ```
+
+   Or:
+   ```bash
+   ASSISTANT_OAUTH_APPS_HUBSPOT_CLIENT_ID=...
+   ASSISTANT_OAUTH_APPS_HUBSPOT_CLIENT_SECRET=...
+   ```
+6. Restart the deployment. Every end user can now click Authorize.
+
+Token refresh is automatic. End users can disconnect from the same
+Settings panel any time.
 
 ## Object types covered
 
