@@ -4,6 +4,12 @@ HubSpot CRM v3 via a curated, vendored OpenAPI 3 spec — gives the LLM
 full request **and** response types for the high-traffic CRM surface
 without depending on HubSpot's now-defunct public spec catalog.
 
+> Pack authoring reference: see
+> [`docs/pack-format.md`](https://github.com/embabel/assistant/blob/main/docs/pack-format.md)
+> in the assistant repo for the full pack format spec — vendored
+> OpenAPI specs, OAuth2, identity introspection, admin OAuth app
+> registry, and per-workspace overrides are all documented there.
+
 ## Why
 
 HubSpot used to publish per-API OpenAPI specs at
