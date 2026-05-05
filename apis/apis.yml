@@ -1,0 +1,23 @@
+# HubSpot CRM v3 — vendored OpenAPI spec.
+#
+# HubSpot no longer publishes per-API OpenAPI specs at a stable public
+# URL (the old `api-catalog-public/v1/apis/...` endpoints all 404 as of
+# 2026). The community-maintained alternatives drift from upstream.
+#
+# Strategy: hand-curated mini-spec covering the ~12 CRM ops that handle
+# 95% of chat-driven workflows. Generalised over object type
+# (`contacts | companies | deals | tickets`) so the surface stays small
+# while coverage stays wide.
+#
+# To extend: add an operation to hubspot-crm.json under the relevant
+# path, give it a unique operationId, and (optionally) add it to the
+# operationIds allowlist below if you want to gate exposure.
+#
+# Auth: Private App access token (Settings → Integrations → Private Apps
+# in the HubSpot UI). Set HUBSPOT_PRIVATE_APP_TOKEN in the credential
+# store or environment. Bearer auth.
+- url: hubspot-crm.json
+  name: hubspot
+  type: openapi
+  auth: bearer
+  token-env: HUBSPOT_PRIVATE_APP_TOKEN

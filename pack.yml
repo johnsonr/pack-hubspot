@@ -1,0 +1,10 @@
+name: hubspot
+description: "HubSpot CRM v3 — typed via a curated, vendored OpenAPI 3 spec covering the high-traffic CRM surface (contacts/companies/deals/tickets CRUD + search + owners + pipelines + associations). Bundles a `hubspot-crm` Agent Skill that teaches the workflow patterns (search-then-update, properties as Map<String,String>, associations v4, pagination)."
+version: 0.1.0
+author: Rod Johnson
+url: https://github.com/johnsonr/pack-hubspot
+tags:
+  - integrations
+  - crm
+  - openapi
+  - skills

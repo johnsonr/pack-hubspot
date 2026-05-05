@@ -1,0 +1,674 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "HubSpot CRM v3 — curated",
+    "version": "0.1.0",
+    "description": "Hand-curated subset of HubSpot's CRM v3 API covering ~95% of chat-driven workflows: contacts/companies/deals/tickets CRUD + search, owners, pipelines, and v4 associations. All object endpoints are parameterised by `objectType` so the same operation works across object kinds and custom objects."
+  },
+  "servers": [
+    { "url": "https://api.hubapi.com" }
+  ],
+  "security": [
+    { "PrivateAppToken": [] }
+  ],
+  "tags": [
+    { "name": "Objects", "description": "Generic CRUD + search across contacts, companies, deals, tickets, and custom objects." },
+    { "name": "Owners", "description": "HubSpot users that records can be assigned to." },
+    { "name": "Pipelines", "description": "Deal and ticket pipelines and their stages." },
+    { "name": "Associations", "description": "Links between two CRM objects (v4 endpoints)." }
+  ],
+  "paths": {
+    "/crm/v3/objects/{objectType}": {
+      "get": {
+        "tags": ["Objects"],
+        "operationId": "objectsList",
+        "summary": "List objects of a given type.",
+        "description": "Returns a paged list of objects. For 'how many' questions prefer `objectsSearch` with `limit: 1` and read `total` — list responses do not include a count.",
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectType" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/After" },
+          { "$ref": "#/components/parameters/Properties" },
+          { "$ref": "#/components/parameters/PropertiesWithHistory" },
+          { "$ref": "#/components/parameters/Associations" },
+          { "$ref": "#/components/parameters/Archived" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged list of objects.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionResponseSimplePublicObject" } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Objects"],
+        "operationId": "objectsCreate",
+        "summary": "Create a new object.",
+        "description": "Creates an object of the given type. `properties` is a Map<String,String> — even numeric and date fields are passed as strings (e.g. amount: '25000', closedate: '2026-06-30').",
+        "parameters": [ { "$ref": "#/components/parameters/ObjectType" } ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SimplePublicObjectInputForCreate" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created object.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SimplePublicObject" } } }
+          }
+        }
+      }
+    },
+    "/crm/v3/objects/{objectType}/{objectId}": {
+      "get": {
+        "tags": ["Objects"],
+        "operationId": "objectsGet",
+        "summary": "Get a single object by ID.",
+        "description": "Pass `properties` to control which fields come back — without it only id/createdate/lastmodifieddate are returned.",
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectType" },
+          { "$ref": "#/components/parameters/ObjectId" },
+          { "$ref": "#/components/parameters/Properties" },
+          { "$ref": "#/components/parameters/PropertiesWithHistory" },
+          { "$ref": "#/components/parameters/Associations" },
+          { "$ref": "#/components/parameters/Archived" },
+          { "$ref": "#/components/parameters/IdProperty" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The object.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SimplePublicObject" } } }
+          },
+          "404": { "description": "Not found." }
+        }
+      },
+      "patch": {
+        "tags": ["Objects"],
+        "operationId": "objectsUpdate",
+        "summary": "Update properties on an object.",
+        "description": "Only the properties you pass are touched. Returns the updated object.",
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectType" },
+          { "$ref": "#/components/parameters/ObjectId" },
+          { "$ref": "#/components/parameters/IdProperty" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SimplePublicObjectInput" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated object.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SimplePublicObject" } } }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Objects"],
+        "operationId": "objectsArchive",
+        "summary": "Archive (soft-delete) an object.",
+        "description": "Soft-deletes the object. Pass `archived: true` to objectsList/objectsGet to retrieve archived records.",
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectType" },
+          { "$ref": "#/components/parameters/ObjectId" }
+        ],
+        "responses": { "204": { "description": "Archived." } }
+      }
+    },
+    "/crm/v3/objects/{objectType}/search": {
+      "post": {
+        "tags": ["Objects"],
+        "operationId": "objectsSearch",
+        "summary": "Search objects by property filters.",
+        "description": "The only way to look up an object by anything other than its ID. Filter groups are OR'd, filters within a group are AND'd. Response includes `total` for counting.",
+        "parameters": [ { "$ref": "#/components/parameters/ObjectType" } ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublicObjectSearchRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results with total count.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionResponseWithTotalSimplePublicObject" } } }
+          }
+        }
+      }
+    },
+    "/crm/v3/owners/": {
+      "get": {
+        "tags": ["Owners"],
+        "operationId": "ownersList",
+        "summary": "List HubSpot users (owners) records can be assigned to.",
+        "description": "Use to look up the `hubspot_owner_id` for a person by email. Owner ID is a string of digits.",
+        "parameters": [
+          {
+            "name": "email", "in": "query", "required": false, "schema": { "type": "string" },
+            "description": "Filter by owner email (exact match)."
+          },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/After" },
+          { "$ref": "#/components/parameters/Archived" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged list of owners.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionResponsePublicOwner" } } }
+          }
+        }
+      }
+    },
+    "/crm/v3/owners/{ownerId}": {
+      "get": {
+        "tags": ["Owners"],
+        "operationId": "ownersGet",
+        "summary": "Get a single owner by ID.",
+        "parameters": [
+          {
+            "name": "ownerId", "in": "path", "required": true, "schema": { "type": "string" },
+            "description": "Owner ID (digits-as-string, e.g. '12345678')."
+          },
+          {
+            "name": "idProperty", "in": "query", "required": false, "schema": { "type": "string", "enum": ["id", "userId"] },
+            "description": "Set to 'userId' to look up by HubSpot user ID instead of owner ID."
+          },
+          { "$ref": "#/components/parameters/Archived" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The owner.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublicOwner" } } }
+          },
+          "404": { "description": "Not found." }
+        }
+      }
+    },
+    "/crm/v3/pipelines/{objectType}": {
+      "get": {
+        "tags": ["Pipelines"],
+        "operationId": "pipelinesList",
+        "summary": "List pipelines for a given object type.",
+        "description": "Returns each pipeline plus its full stage list inline. Use this before creating/updating deals or tickets to find valid `pipeline` and `dealstage` (or `hs_pipeline_stage`) IDs.",
+        "parameters": [
+          {
+            "name": "objectType", "in": "path", "required": true,
+            "schema": { "type": "string", "enum": ["deals", "tickets"] },
+            "description": "Object type. Only deals and tickets have pipelines in HubSpot."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pipelines with stages.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionResponsePipeline" } } }
+          }
+        }
+      }
+    },
+    "/crm/v3/pipelines/{objectType}/{pipelineId}/stages": {
+      "get": {
+        "tags": ["Pipelines"],
+        "operationId": "pipelinesListStages",
+        "summary": "List stages within a single pipeline.",
+        "description": "Usually unnecessary — `pipelinesList` already includes stages inline. Use only when you have the pipeline ID but need a fresh stage list.",
+        "parameters": [
+          {
+            "name": "objectType", "in": "path", "required": true,
+            "schema": { "type": "string", "enum": ["deals", "tickets"] }
+          },
+          {
+            "name": "pipelineId", "in": "path", "required": true,
+            "schema": { "type": "string" },
+            "description": "Pipeline ID from `pipelinesList`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stages in this pipeline.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionResponsePipelineStage" } } }
+          }
+        }
+      }
+    },
+    "/crm/v4/objects/{fromObjectType}/{fromObjectId}/associations/{toObjectType}": {
+      "get": {
+        "tags": ["Associations"],
+        "operationId": "associationsGet",
+        "summary": "List associations from one object to all objects of another type.",
+        "description": "v4 endpoint. Returns `{ results: [{ toObjectId, associationTypes: [{ category, typeId, label }] }] }`. `toObjectId` is an integer.",
+        "parameters": [
+          { "$ref": "#/components/parameters/FromObjectType" },
+          { "$ref": "#/components/parameters/FromObjectId" },
+          { "$ref": "#/components/parameters/ToObjectType" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/After" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged list of associations.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionResponseAssociation" } } }
+          }
+        }
+      }
+    },
+    "/crm/v4/objects/{fromObjectType}/{fromObjectId}/associations/default/{toObjectType}/{toObjectId}": {
+      "put": {
+        "tags": ["Associations"],
+        "operationId": "associationsCreateDefault",
+        "summary": "Create the default association between two objects.",
+        "description": "v4 endpoint. HubSpot picks the standard relationship type (e.g. contact-to-company → 'Primary'). For custom association types use the spec's full `associationsCreate` op (not in this curated spec — rare in chat).",
+        "parameters": [
+          { "$ref": "#/components/parameters/FromObjectType" },
+          { "$ref": "#/components/parameters/FromObjectId" },
+          { "$ref": "#/components/parameters/ToObjectType" },
+          {
+            "name": "toObjectId", "in": "path", "required": true,
+            "schema": { "type": "string" },
+            "description": "Target object ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Association created.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssociationCreatedResponse" } } }
+          },
+          "201": {
+            "description": "Association created.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssociationCreatedResponse" } } }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Associations"],
+        "operationId": "associationsArchive",
+        "summary": "Remove all associations between two specific objects.",
+        "parameters": [
+          { "$ref": "#/components/parameters/FromObjectType" },
+          { "$ref": "#/components/parameters/FromObjectId" },
+          { "$ref": "#/components/parameters/ToObjectType" },
+          {
+            "name": "toObjectId", "in": "path", "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "204": { "description": "Removed." } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "PrivateAppToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "HubSpot Private App access token. Create in HubSpot Settings → Integrations → Private Apps. Sent as `Authorization: Bearer pat-na1-...`."
+      }
+    },
+    "parameters": {
+      "ObjectType": {
+        "name": "objectType", "in": "path", "required": true,
+        "schema": {
+          "type": "string",
+          "examples": ["contacts", "companies", "deals", "tickets", "notes", "tasks", "calls", "emails", "meetings"]
+        },
+        "description": "CRM object type — plural for standard objects ('contacts', 'companies', 'deals', 'tickets'). Engagement types ('notes', 'tasks', 'calls', 'emails', 'meetings') and custom object names also work."
+      },
+      "ObjectId": {
+        "name": "objectId", "in": "path", "required": true,
+        "schema": { "type": "string" },
+        "description": "Object ID — string of digits returned by create/list/search responses."
+      },
+      "FromObjectType": {
+        "name": "fromObjectType", "in": "path", "required": true,
+        "schema": { "type": "string" },
+        "description": "Source object type."
+      },
+      "FromObjectId": {
+        "name": "fromObjectId", "in": "path", "required": true,
+        "schema": { "type": "string" },
+        "description": "Source object ID."
+      },
+      "ToObjectType": {
+        "name": "toObjectType", "in": "path", "required": true,
+        "schema": { "type": "string" },
+        "description": "Target object type."
+      },
+      "Limit": {
+        "name": "limit", "in": "query", "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
+        "description": "Page size. Max 100."
+      },
+      "After": {
+        "name": "after", "in": "query", "required": false,
+        "schema": { "type": "string" },
+        "description": "Pagination cursor from a previous response's `paging.next.after`."
+      },
+      "Properties": {
+        "name": "properties", "in": "query", "required": false,
+        "explode": false,
+        "schema": { "type": "array", "items": { "type": "string" } },
+        "description": "Comma-separated list of property names to include in the response. Without this, only id/createdate/lastmodifieddate come back."
+      },
+      "PropertiesWithHistory": {
+        "name": "propertiesWithHistory", "in": "query", "required": false,
+        "explode": false,
+        "schema": { "type": "array", "items": { "type": "string" } },
+        "description": "Property names to include with full change history (`propertiesWithHistory` field in response)."
+      },
+      "Associations": {
+        "name": "associations", "in": "query", "required": false,
+        "explode": false,
+        "schema": { "type": "array", "items": { "type": "string" } },
+        "description": "Object types to include associated IDs for, inline on each object."
+      },
+      "Archived": {
+        "name": "archived", "in": "query", "required": false,
+        "schema": { "type": "boolean", "default": false },
+        "description": "If true, returns only archived (soft-deleted) records."
+      },
+      "IdProperty": {
+        "name": "idProperty", "in": "query", "required": false,
+        "schema": { "type": "string" },
+        "description": "Look up by an alternate unique property instead of the object ID. E.g. `idProperty=email` lets you pass an email address as `objectId`."
+      }
+    },
+    "schemas": {
+      "SimplePublicObject": {
+        "type": "object",
+        "required": ["id", "properties", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "description": "Object ID — digits as string." },
+          "properties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "All requested properties as a Map<String,String>. Numeric and date values are also strings."
+          },
+          "propertiesWithHistory": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/ValueWithTimestamp" }
+            }
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "archived": { "type": "boolean" },
+          "archivedAt": { "type": "string", "format": "date-time" },
+          "associations": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/components/schemas/AssociationsBlock" },
+            "description": "Inline associations, present only when the request asked for them."
+          }
+        }
+      },
+      "ValueWithTimestamp": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "sourceType": { "type": "string" },
+          "sourceId": { "type": "string" },
+          "updatedByUserId": { "type": "integer" }
+        }
+      },
+      "AssociationsBlock": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "description": "Associated object ID." },
+                "type": { "type": "string", "description": "Association type label." }
+              }
+            }
+          }
+        }
+      },
+      "SimplePublicObjectInput": {
+        "type": "object",
+        "required": ["properties"],
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Properties to set as Map<String,String>. Pass numbers and dates as strings."
+          }
+        }
+      },
+      "SimplePublicObjectInputForCreate": {
+        "type": "object",
+        "required": ["properties"],
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "associations": {
+            "type": "array",
+            "description": "Optional associations to create alongside the new object.",
+            "items": { "$ref": "#/components/schemas/CreateAssociation" }
+          }
+        }
+      },
+      "CreateAssociation": {
+        "type": "object",
+        "required": ["to", "types"],
+        "properties": {
+          "to": {
+            "type": "object",
+            "required": ["id"],
+            "properties": { "id": { "type": "string" } }
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "associationCategory": { "type": "string", "enum": ["HUBSPOT_DEFINED", "USER_DEFINED", "INTEGRATOR_DEFINED"] },
+                "associationTypeId": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "PublicObjectSearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Free-text search across default-searchable properties (`firstname`, `lastname`, `email`, `phone`, `company` for contacts; `name`, `domain` for companies; etc.)."
+          },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
+          "after": { "type": "string" },
+          "sorts": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Property names to sort by, e.g. ['-createdate'] for newest first."
+          },
+          "properties": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Property names to include in each result."
+          },
+          "filterGroups": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FilterGroup" },
+            "description": "Filter groups are OR'd together; filters within a group are AND'd."
+          }
+        }
+      },
+      "FilterGroup": {
+        "type": "object",
+        "required": ["filters"],
+        "properties": {
+          "filters": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Filter" }
+          }
+        }
+      },
+      "Filter": {
+        "type": "object",
+        "required": ["propertyName", "operator"],
+        "properties": {
+          "propertyName": { "type": "string" },
+          "operator": {
+            "type": "string",
+            "enum": ["EQ", "NEQ", "LT", "LTE", "GT", "GTE", "BETWEEN", "IN", "NOT_IN", "HAS_PROPERTY", "NOT_HAS_PROPERTY", "CONTAINS_TOKEN", "NOT_CONTAINS_TOKEN"]
+          },
+          "value": { "type": "string", "description": "Comparison value (most operators)." },
+          "highValue": { "type": "string", "description": "Upper bound for BETWEEN." },
+          "values": {
+            "type": "array", "items": { "type": "string" },
+            "description": "List of values for IN / NOT_IN."
+          }
+        }
+      },
+      "CollectionResponseSimplePublicObject": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/SimplePublicObject" } },
+          "paging": { "$ref": "#/components/schemas/ForwardPaging" }
+        }
+      },
+      "CollectionResponseWithTotalSimplePublicObject": {
+        "type": "object",
+        "required": ["total", "results"],
+        "properties": {
+          "total": { "type": "integer", "description": "Total number of matching records." },
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/SimplePublicObject" } },
+          "paging": { "$ref": "#/components/schemas/ForwardPaging" }
+        }
+      },
+      "ForwardPaging": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "object",
+            "properties": {
+              "after": { "type": "string", "description": "Cursor to pass to the next request as `after`." },
+              "link": { "type": "string", "description": "Full URL of the next page." }
+            }
+          }
+        }
+      },
+      "PublicOwner": {
+        "type": "object",
+        "required": ["id", "createdAt", "updatedAt", "archived"],
+        "properties": {
+          "id": { "type": "string", "description": "Owner ID — digits as string. This is what `hubspot_owner_id` expects." },
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "userId": { "type": "integer", "description": "Internal HubSpot user ID. Different from owner ID." },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "archived": { "type": "boolean" },
+          "teams": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PublicTeam" }
+          }
+        }
+      },
+      "PublicTeam": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "membership": { "type": "string", "enum": ["PRIMARY", "SECONDARY", "CHILD"] }
+        }
+      },
+      "CollectionResponsePublicOwner": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/PublicOwner" } },
+          "paging": { "$ref": "#/components/schemas/ForwardPaging" }
+        }
+      },
+      "Pipeline": {
+        "type": "object",
+        "required": ["id", "label", "displayOrder", "stages", "createdAt", "updatedAt", "archived"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string", "description": "Human-readable pipeline name." },
+          "displayOrder": { "type": "integer" },
+          "stages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PipelineStage" }
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "archived": { "type": "boolean" }
+        }
+      },
+      "PipelineStage": {
+        "type": "object",
+        "required": ["id", "label", "displayOrder", "metadata", "createdAt", "updatedAt", "archived"],
+        "properties": {
+          "id": { "type": "string", "description": "Stage ID. This is what `dealstage` and `hs_pipeline_stage` expect — NOT the label." },
+          "label": { "type": "string" },
+          "displayOrder": { "type": "integer" },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Stage metadata. For deal stages includes `probability` (0.0–1.0 as string) and `isClosed` ('true'/'false')."
+          },
+          "writePermissions": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "archived": { "type": "boolean" }
+        }
+      },
+      "CollectionResponsePipeline": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/Pipeline" } }
+        }
+      },
+      "CollectionResponsePipelineStage": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/PipelineStage" } }
+        }
+      },
+      "Association": {
+        "type": "object",
+        "required": ["toObjectId", "associationTypes"],
+        "properties": {
+          "toObjectId": { "type": "integer", "description": "Associated object ID. v4 returns this as an integer (unlike object IDs elsewhere which are strings)." },
+          "associationTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": { "type": "string", "enum": ["HUBSPOT_DEFINED", "USER_DEFINED", "INTEGRATOR_DEFINED"] },
+                "typeId": { "type": "integer" },
+                "label": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "CollectionResponseAssociation": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/Association" } },
+          "paging": { "$ref": "#/components/schemas/ForwardPaging" }
+        }
+      },
+      "AssociationCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "fromObjectTypeId": { "type": "string" },
+          "fromObjectId": { "type": "integer" },
+          "toObjectTypeId": { "type": "string" },
+          "toObjectId": { "type": "integer" },
+          "labels": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
