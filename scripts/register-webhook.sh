@@ -13,12 +13,19 @@
 # without duplicating the subscription.
 #
 # Usage:
-#   scripts/register-webhook.sh <app-id> <developer-hapikey> <public-base-url>
+#   scripts/register-webhook.sh <public-base-url>
+#   scripts/register-webhook.sh <public-base-url> <app-id> <developer-hapikey>
 #
-# Example:
-#   scripts/register-webhook.sh 678910 hapi-xxx-xxx https://my-host.example.com
+# Short form (RECOMMENDED): pass only the public URL. The script reads
+#   `app-id` and `developer-key` from the deployment's
+#   admin/oauth-apps.yml under apps.hubspot.* — the same file that
+#   already holds your client-id and client-secret. Falls back to
+#   <workspace>/config/oauth-apps.yml when the admin file isn't present.
 #
-# Where to find these values (DEVELOPER ACCOUNT, not your CRM portal):
+# Long form (override): pass all three positional args. Useful if you
+#   want to register against a different app without editing the YAML.
+#
+# Where to find the values (DEVELOPER ACCOUNT, not your CRM portal):
 #
 #   <app-id>            Numeric id in the dev portal URL:
 #                       /developer/<accountId>/applications/<appId>
@@ -43,25 +50,120 @@
 
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <app-id> <developer-hapikey> <public-base-url>" >&2
-  echo "Example: $0 678910 hapi-xxx https://my-host.example.com" >&2
+usage() {
+  cat <<EOF >&2
+Usage:
+  $0 <public-base-url>                                  # reads app-id + dev key from oauth-apps.yml
+  $0 <public-base-url> <app-id> <developer-hapikey>     # explicit override
+
+Example:
+  $0 https://my-host.example.com
+  $0 https://my-host.example.com 678910 hapi-xxx
+EOF
+}
+
+if [[ $# -lt 1 || $# -gt 3 || $# -eq 2 ]]; then
+  usage
   exit 64
 fi
 
-APP_ID="$1"
-HAPIKEY="$2"
-BASE_URL="${3%/}"   # strip trailing slash if present
+command -v jq >/dev/null || { echo "jq required (brew install jq)" >&2; exit 69; }
+
+BASE_URL="${1%/}"   # strip trailing slash if present
 TARGET_URL="${BASE_URL}/api/v1/webhooks/hubspot"
 EVENT_TYPE="contact.creation"
 
-command -v jq >/dev/null || { echo "jq required (brew install jq)" >&2; exit 69; }
+# --- Resolve app-id + developer key from oauth-apps.yml --------------
+read_yaml_field() {
+  # $1: file path, $2: dotted key under apps.hubspot.*
+  local file="$1" key="$2"
+  [[ -f "$file" ]] || return 1
+  if command -v python3 >/dev/null && python3 -c 'import yaml' 2>/dev/null; then
+    python3 -c "
+import sys, yaml
+d = yaml.safe_load(open('$file')) or {}
+v = d.get('apps', {}).get('hubspot', {}).get('$key', '') or ''
+sys.stdout.write(str(v))
+" 2>/dev/null
+  else
+    # Fallback: simple grep+awk for two-space-indented keys under
+    # apps.hubspot. Good enough for the conventional shape; falls back
+    # to "ask the operator to install python3-yaml or pass args
+    # explicitly" if the YAML is heavily structured.
+    awk -v target="$key" '
+      /^apps:/ { in_apps=1; next }
+      /^[^[:space:]]/ { in_apps=0 }
+      in_apps && /^[[:space:]]+hubspot:[[:space:]]*$/ { in_hub=1; next }
+      in_apps && /^[[:space:]]+[a-zA-Z][^:]*:[[:space:]]*$/ && !/hubspot:/ { in_hub=0 }
+      in_hub {
+        n = split($0, parts, ":")
+        if (n >= 2) {
+          field = parts[1]
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", field)
+          if (field == target) {
+            value = substr($0, index($0, ":") + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            gsub(/^"|"$/, "", value)
+            print value
+            exit
+          }
+        }
+      }
+    ' "$file"
+  fi
+}
+
+resolve_creds() {
+  local admin="${WORKSPACE_BASE:-$HOME/embabel/assistant}/admin/oauth-apps.yml"
+  for path in "$admin" "$PWD/admin/oauth-apps.yml"; do
+    if [[ -f "$path" ]]; then
+      RESOLVED_APP_ID=$(read_yaml_field "$path" "app-id")
+      RESOLVED_KEY=$(read_yaml_field "$path" "developer-key")
+      if [[ -n "$RESOLVED_APP_ID" && -n "$RESOLVED_KEY" ]]; then
+        SOURCE="$path"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+if [[ $# -eq 3 ]]; then
+  APP_ID="$2"
+  HAPIKEY="$3"
+  echo "→ Using app-id and developer-key from positional args"
+else
+  if ! resolve_creds; then
+    cat >&2 <<EOF
+✗ Could not resolve app-id + developer-key from oauth-apps.yml.
+  Looked in:
+    \$WORKSPACE_BASE/admin/oauth-apps.yml (default)
+    ./admin/oauth-apps.yml (cwd fallback)
+
+  Either add to apps.hubspot.* in that file:
+    apps:
+      hubspot:
+        client-id:    "..."
+        client-secret: "..."
+        app-id:       "678910"        # ← add this
+        developer-key: "hapi-xxx"     # ← and this
+
+  …or pass them explicitly:
+    $0 $BASE_URL <app-id> <developer-hapikey>
+EOF
+    exit 78
+  fi
+  APP_ID="$RESOLVED_APP_ID"
+  HAPIKEY="$RESOLVED_KEY"
+  echo "→ Using app-id and developer-key from $SOURCE"
+fi
 
 echo "→ Configuring webhook for app $APP_ID"
 echo "  target URL: $TARGET_URL"
 
-# 1. Set / update the target URL on the app. PUT is idempotent — repeated
-#    calls with the same URL are no-ops; with a different URL, overwrite.
+# --- 1. Set / update the target URL on the app -----------------------
+# PUT is idempotent — repeated calls with the same URL are no-ops; with
+# a different URL, overwrite.
 echo "→ Setting webhook target URL …"
 SETTINGS_RESPONSE=$(curl -sS -X PUT \
   "https://api.hubapi.com/webhooks/v3/${APP_ID}/settings?hapikey=${HAPIKEY}" \
@@ -77,7 +179,7 @@ if echo "$SETTINGS_RESPONSE" | jq -e '.status == "error"' >/dev/null 2>&1; then
 fi
 echo "  ✓ target URL set"
 
-# 2. List current subscriptions to decide whether to POST a new one.
+# --- 2. List current subscriptions, decide POST vs PATCH vs no-op ----
 echo "→ Listing existing subscriptions …"
 SUBS=$(curl -sS \
   "https://api.hubapi.com/webhooks/v3/${APP_ID}/subscriptions?hapikey=${HAPIKEY}")

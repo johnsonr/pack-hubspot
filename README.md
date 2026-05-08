@@ -108,26 +108,48 @@ on HubSpot's side has to be created once per installation** (HubSpot
 exposes app-webhook configuration only via API, not the dev portal UI
 for newer Public Apps).
 
-A helper script does it. Run once after configuring `oauth-apps.yml`:
+A helper script does it. Two ways to invoke:
 
-```bash
-scripts/register-webhook.sh <app-id> <developer-hapikey> <public-base-url>
+**Recommended — short form.** Add `app-id` and `developer-key` to your existing `apps.hubspot` block in `admin/oauth-apps.yml` (the same file that already holds `client-id` / `client-secret`):
+
+```yaml
+apps:
+  hubspot:
+    client-id:    "..."
+    client-secret: "..."
+    app-id:       "678910"          # ← add
+    developer-key: "hapi-xxx-xxx"   # ← add
 ```
 
-| Argument | Where to find it |
+Then:
+
+```bash
+scripts/register-webhook.sh <public-base-url>
+```
+
+The script reads `app-id` and `developer-key` from `oauth-apps.yml` (admin file by default; `<workspace>/config/oauth-apps.yml` as fallback).
+
+**Override — long form.** Pass all three explicitly to register against a different app without editing YAML:
+
+```bash
+scripts/register-webhook.sh <public-base-url> <app-id> <developer-hapikey>
+```
+
+### Where to find each value
+
+| Field | Where to find it |
 |---|---|
-| `<app-id>` | Open your app in the developer portal. The URL is `https://app.hubspot.com/developer/<account-id>/applications/<app-id>` — the **numeric id after `/applications/`**. Six-to-eight digits. |
-| `<developer-hapikey>` | In your **Developer Account** (not your CRM portal): click the **⚙ Settings icon** (top nav) → **Integrations → API key** (left sidebar) → click **Show key** or **Generate**. Super Admin permission required. ⚠️ This is the *Developer* API Key, **not** the (deprecated) standard HubSpot API key, and **not** the OAuth Client Secret — three different credentials. The Developer API key remains active despite the broader 2022 API-key deprecation, because it's what authenticates app-management endpoints like webhook subscriptions. |
+| `app-id` | Open your app in the developer portal. The URL is `https://app.hubspot.com/developer/<account-id>/applications/<app-id>` — the **numeric id after `/applications/`**. Six-to-eight digits. Public, not secret. |
+| `developer-key` | In your **Developer Account** (not your CRM portal): click the **⚙ Settings icon** (top nav) → **Integrations → API key** (left sidebar) → **Show key** or **Generate**. Super Admin permission required. ⚠️ This is the *Developer* API Key, **not** the (deprecated) standard HubSpot API key, and **not** the OAuth Client Secret — three different credentials. The Developer API key remains active despite the broader 2022 API-key deprecation, because it's what authenticates app-management endpoints like webhook subscriptions. |
 | `<public-base-url>` | The public host your assistant accepts webhooks on, no trailing slash. E.g. `https://my-host.example.com` or your Tailscale Funnel hostname. The script appends `/api/v1/webhooks/hubspot`. |
 
 If you have multiple HubSpot accounts (a CRM tenant plus a separate Developer Account hosting your apps), make sure you're logged into the **Developer Account** when looking up the API key — it's not in the CRM portal's settings.
 
-Idempotent — re-running after a public-URL change updates the target
-URL without duplicating the subscription. Safe to re-run after any
-restart or admin change.
+Idempotent — re-running after a public-URL change updates the target URL without duplicating the subscription. Safe to re-run after any restart or admin change.
 
 ```bash
-$ scripts/register-webhook.sh 678910 hapi-xxx https://example.com
+$ scripts/register-webhook.sh https://example.com
+→ Using app-id and developer-key from /Users/rod/embabel/assistant/admin/oauth-apps.yml
 → Configuring webhook for app 678910
   target URL: https://example.com/api/v1/webhooks/hubspot
 → Setting webhook target URL …
