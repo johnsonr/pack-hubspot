@@ -100,6 +100,48 @@ different brand on the consent screen.
 Token refresh is automatic. End users can disconnect from the same
 Settings panel any time.
 
+### Webhook setup (one-time, operator only)
+
+The pack ships a `webhooks/contact-creation.yml` registration that
+declares signature verification + tenancy. **The actual subscription
+on HubSpot's side has to be created once per installation** (HubSpot
+exposes app-webhook configuration only via API, not the dev portal UI
+for newer Public Apps).
+
+A helper script does it. Run once after configuring `oauth-apps.yml`:
+
+```bash
+scripts/register-webhook.sh <app-id> <developer-hapikey> <public-base-url>
+```
+
+| Argument | Where to find it |
+|---|---|
+| `<app-id>` | Open your app in the developer portal. The URL is `https://app.hubspot.com/developer/<account-id>/applications/<app-id>` — the **numeric id after `/applications/`**. Six-to-eight digits. |
+| `<developer-hapikey>` | In your **Developer Account** (not your CRM portal): click the **⚙ Settings icon** (top nav) → **Integrations → API key** (left sidebar) → click **Show key** or **Generate**. Super Admin permission required. ⚠️ This is the *Developer* API Key, **not** the (deprecated) standard HubSpot API key, and **not** the OAuth Client Secret — three different credentials. The Developer API key remains active despite the broader 2022 API-key deprecation, because it's what authenticates app-management endpoints like webhook subscriptions. |
+| `<public-base-url>` | The public host your assistant accepts webhooks on, no trailing slash. E.g. `https://my-host.example.com` or your Tailscale Funnel hostname. The script appends `/api/v1/webhooks/hubspot`. |
+
+If you have multiple HubSpot accounts (a CRM tenant plus a separate Developer Account hosting your apps), make sure you're logged into the **Developer Account** when looking up the API key — it's not in the CRM portal's settings.
+
+Idempotent — re-running after a public-URL change updates the target
+URL without duplicating the subscription. Safe to re-run after any
+restart or admin change.
+
+```bash
+$ scripts/register-webhook.sh 678910 hapi-xxx https://example.com
+→ Configuring webhook for app 678910
+  target URL: https://example.com/api/v1/webhooks/hubspot
+→ Setting webhook target URL …
+  ✓ target URL set
+→ Listing existing subscriptions …
+→ Creating contact.creation subscription …
+  ✓ created subscription id=42
+```
+
+End users never run this. Once the subscription exists, every user who
+later authorizes via Settings → Connected Services contributes their
+contacts to the same webhook stream — the assistant's `payload-field`
+tenancy resolver routes each event to the right user via `portalId`.
+
 ## Object types covered
 
 `contacts`, `companies`, `deals`, `tickets`. All share the same
