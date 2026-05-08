@@ -108,7 +108,14 @@ on HubSpot's side has to be created once per installation** (HubSpot
 exposes app-webhook configuration only via API, not the dev portal UI
 for newer Public Apps).
 
-A helper script does it. Two ways to invoke:
+A helper script does it. **Run it from the root of this pack** — wherever it lives on the operator's machine. For a pack installed into a workspace that's typically:
+
+```bash
+cd ~/embabel/assistant/<your-username>/<your-workspace>/config/packs/pack-hubspot
+git pull   # if it's been a while
+```
+
+Two ways to invoke:
 
 **Recommended — short form.** Add `app-id` and `developer-key` to your existing `apps.hubspot` block in `admin/oauth-apps.yml` (the same file that already holds `client-id` / `client-secret`):
 
