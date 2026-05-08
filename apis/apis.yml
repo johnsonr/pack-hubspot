@@ -37,3 +37,8 @@
       auth: path-token
       account-id-field: hub_id
       display-name-field: hub_domain
+    # Tells the OAuth callback to register the resolved hub_id as a
+    # webhook tenant key. An inbound HubSpot webhook carrying the same
+    # portalId is then routed back to this user without re-authentication.
+    webhook-tenancy:
+      store: hubspot-portal-id
