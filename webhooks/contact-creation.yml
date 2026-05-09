@@ -48,8 +48,10 @@
 
   tenancy:
     resolver: payload-field
-    # HubSpot wraps webhook events in an array; the first event's
-    # portalId is the tenant. Per-element fan-out is handled in the
-    # action implementation, not here.
-    field: 0.portalId
+    # HubSpot batches events in a JSON array. The webhook controller
+    # unwraps the array and dispatches each inner event through tenancy +
+    # signal projection individually, so the resolver sees the already-
+    # unwrapped event object — `portalId` at top level, no array-index
+    # prefix needed.
+    field: portalId
     store: hubspot-portal-id
