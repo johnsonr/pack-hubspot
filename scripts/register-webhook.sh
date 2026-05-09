@@ -74,43 +74,58 @@ TARGET_URL="${BASE_URL}/api/v1/webhooks/hubspot"
 EVENT_TYPE="contact.creation"
 
 # --- Resolve app-id + developer key from oauth-apps.yml --------------
+#
+# Tries real YAML parsers in priority order. Each prints the field
+# value (or empty string) on stdout. We pass the file path and key as
+# *arguments* (not interpolated into the source) so paths with quotes
+# or other shell-special characters don't break parsing.
+#
+#   1. yq            — purpose-built, perfect parsing, but install-only
+#   2. python3+yaml  — most reliable; PyYAML isn't stdlib but is common
+#   3. ruby+yaml     — ships with macOS today (deprecated but present)
+#
+# The previous awk fallback was too brittle — silently failed on
+# common quoting / inline-comment / empty-value variations. Better to
+# raise a clear "install one of these" error than silently mis-parse.
 read_yaml_field() {
-  # $1: file path, $2: dotted key under apps.hubspot.*
   local file="$1" key="$2"
   [[ -f "$file" ]] || return 1
-  if command -v python3 >/dev/null && python3 -c 'import yaml' 2>/dev/null; then
-    python3 -c "
-import sys, yaml
-d = yaml.safe_load(open('$file')) or {}
-v = d.get('apps', {}).get('hubspot', {}).get('$key', '') or ''
-sys.stdout.write(str(v))
-" 2>/dev/null
-  else
-    # Fallback: simple grep+awk for two-space-indented keys under
-    # apps.hubspot. Good enough for the conventional shape; falls back
-    # to "ask the operator to install python3-yaml or pass args
-    # explicitly" if the YAML is heavily structured.
-    awk -v target="$key" '
-      /^apps:/ { in_apps=1; next }
-      /^[^[:space:]]/ { in_apps=0 }
-      in_apps && /^[[:space:]]+hubspot:[[:space:]]*$/ { in_hub=1; next }
-      in_apps && /^[[:space:]]+[a-zA-Z][^:]*:[[:space:]]*$/ && !/hubspot:/ { in_hub=0 }
-      in_hub {
-        n = split($0, parts, ":")
-        if (n >= 2) {
-          field = parts[1]
-          gsub(/^[[:space:]]+|[[:space:]]+$/, "", field)
-          if (field == target) {
-            value = substr($0, index($0, ":") + 1)
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-            gsub(/^"|"$/, "", value)
-            print value
-            exit
-          }
-        }
-      }
-    ' "$file"
+
+  if command -v yq >/dev/null 2>&1; then
+    yq -r ".apps.hubspot[\"$key\"] // \"\"" "$file" 2>/dev/null
+    return
   fi
+
+  if command -v python3 >/dev/null && python3 -c 'import yaml' 2>/dev/null; then
+    python3 -c '
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1])) or {}
+v = d.get("apps", {}).get("hubspot", {}).get(sys.argv[2], "") or ""
+sys.stdout.write(str(v))
+' "$file" "$key" 2>/dev/null
+    return
+  fi
+
+  if command -v ruby >/dev/null 2>&1; then
+    ruby -ryaml -e '
+      d = YAML.load_file(ARGV[0]) || {}
+      print((d.dig("apps", "hubspot", ARGV[1]) || "").to_s)
+    ' "$file" "$key" 2>/dev/null
+    return
+  fi
+
+  # Nothing usable — let the caller fail gracefully with the friendly
+  # "install python3-yaml / brew install yq" message.
+  return 0
+}
+
+# Detect whether any usable YAML parser exists. Used to give a clearer
+# error when ALL of them are missing (vs. just "fields not found").
+has_yaml_parser() {
+  command -v yq >/dev/null 2>&1 && return 0
+  command -v python3 >/dev/null && python3 -c 'import yaml' 2>/dev/null && return 0
+  command -v ruby >/dev/null 2>&1 && return 0
+  return 1
 }
 
 resolve_creds() {
@@ -133,22 +148,34 @@ if [[ $# -eq 3 ]]; then
   HAPIKEY="$3"
   echo "→ Using app-id and developer-key from positional args"
 else
+  if ! has_yaml_parser; then
+    cat >&2 <<EOF
+✗ Short form needs a YAML parser. None of the candidates are available:
+    - yq          (brew install yq)
+    - python3 + PyYAML  (pip3 install pyyaml)
+    - ruby        (ships with macOS)
+
+  Install one, OR use the long form to bypass YAML reading entirely:
+    $0 $BASE_URL <app-id> <developer-hapikey>
+EOF
+    exit 69
+  fi
   if ! resolve_creds; then
     cat >&2 <<EOF
 ✗ Could not resolve app-id + developer-key from oauth-apps.yml.
   Looked in:
-    \$WORKSPACE_BASE/admin/oauth-apps.yml (default)
-    ./admin/oauth-apps.yml (cwd fallback)
+    \$WORKSPACE_BASE/admin/oauth-apps.yml (default: $HOME/embabel/assistant/admin/oauth-apps.yml)
+    $PWD/admin/oauth-apps.yml (cwd fallback)
 
-  Either add to apps.hubspot.* in that file:
+  Add app-id and developer-key under the existing apps.hubspot block:
     apps:
       hubspot:
-        client-id:    "..."
-        client-secret: "..."
+        client-id:    "..."           # already present
+        client-secret: "..."          # already present
         app-id:       "678910"        # ← add this
         developer-key: "hapi-xxx"     # ← and this
 
-  …or pass them explicitly:
+  Or pass them explicitly:
     $0 $BASE_URL <app-id> <developer-hapikey>
 EOF
     exit 78
