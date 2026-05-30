@@ -6,3 +6,41 @@
     portalId: "HubSpot portal (account) id"
     subscriptionType: "Webhook subscription type — always 'contact.creation' for this event"
     changeSource: "How the contact was created (CRM, FORM, IMPORT, INTEGRATION, …)"
+
+# Deterministic KG population (no LLM). A HubSpot contact is mirrored into
+# the KG and resolved onto a canonical :Person by email. The projection is
+# declared entirely here — property `metadata` drives the in-tree
+# DeterministicEntityProjector; there is no Kotlin in this pack.
+#   identity     → this field's value is the email merge key
+#   canonical    → project onto the canonical Person field of this name
+#   relationship → resolve a related entity and link it
+# Undeclared HubSpot fields (lifecyclestage, hs_object_id, …) still land on
+# the mirror node verbatim; they're source-private, not projected.
+- name: HubSpotContact
+  parents: [Contact]
+  visibility: internal
+  description: "A HubSpot CRM contact, mirrored into the KG and resolved onto a canonical Person by email."
+  userAnchor:
+    predicate: OWNED_BY
+    direction: from-user
+  properties:
+    email:
+      description: "Primary email — the deterministic merge key onto the canonical Person."
+      metadata:
+        identity: "true"
+    jobtitle:
+      description: "Job title; projects onto the canonical Person, winner by host precedence then recency."
+      metadata:
+        canonical: "jobTitle"
+    company:
+      description: "Company name; resolved to an Organization and linked WORKS_FOR."
+      metadata:
+        relationship: "WORKS_FOR"
+        target: "Organization"
+        matchBy: "name"
+    phone:
+      description: "Phone number; unioned across sources onto the canonical Person."
+      cardinality: LIST
+      metadata:
+        canonical: "phones"
+        multivalued: "true"
