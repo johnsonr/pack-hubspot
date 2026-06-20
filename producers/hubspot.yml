@@ -1,0 +1,39 @@
+# Virtual-join producers (see specs/VIRTUAL_CYPHER.md). Each is a BATCH-keyed
+# fetch: it accepts ALL anchor keys at once and returns the matching records, so
+# a traversal over many anchors costs one search, not N. Backed by the curated
+# HubSpot `objectsSearch` op (POST /crm/v3/objects/{objectType}/search), whose
+# `filterGroups[].filters[].values` takes an `IN` list — the keys are injected
+# there via `keyArg`. The JVM never sees HubSpot's REST shape beyond these two
+# pointers.
+
+- name: contactsByEmail
+  kind: api
+  operation: objectsSearch
+  records: "$.results[*].properties"
+  keyArg: "filterGroups.0.filters.0.values"
+  args:
+    objectType: contacts
+    properties: [email, firstname, lastname, jobtitle, phone, company]
+    filterGroups:
+      - filters:
+          - propertyName: email
+            operator: IN
+  cache:
+    kind: ttl
+    seconds: 300
+
+- name: companiesByDomain
+  kind: api
+  operation: objectsSearch
+  records: "$.results[*].properties"
+  keyArg: "filterGroups.0.filters.0.values"
+  args:
+    objectType: companies
+    properties: [domain, name, industry, website, city, country]
+    filterGroups:
+      - filters:
+          - propertyName: domain
+            operator: IN
+  cache:
+    kind: ttl
+    seconds: 300

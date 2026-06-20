@@ -7,40 +7,57 @@
     subscriptionType: "Webhook subscription type — always 'contact.creation' for this event"
     changeSource: "How the contact was created (CRM, FORM, IMPORT, INTEGRATION, …)"
 
-# Deterministic KG population (no LLM). A HubSpot contact is mirrored into
-# the KG and resolved onto a canonical :Person by email. The projection is
-# declared entirely here — property `metadata` drives the in-tree
-# DeterministicEntityProjector; there is no Kotlin in this pack.
-#   identity     → this field's value is the email merge key
-#   canonical    → project onto the canonical Person field of this name
-#   relationship → resolve a related entity and link it
-# Undeclared HubSpot fields (lifecyclestage, hs_object_id, …) still land on
-# the mirror node verbatim; they're source-private, not projected.
+# On-demand virtual node (NOT eagerly mirrored). A HubSpot contact is fetched
+# only when a Cypher query traverses to it from a canonical :Person, materialized
+# transiently for that query, then rolled back. See specs/VIRTUAL_CYPHER.md.
+#
+#   MATCH (p:Person {email:'x@y.com'})-[:HAS_HUBSPOT_CONTACT]->(hc:HubSpotContact)
+#   RETURN hc.jobtitle, hc.phone
+#
+# Linking: id-match on the shared `email` (Person.email == contact.email). The
+# fetch is batched by the `contactsByEmail` producer (one search, emails IN […]),
+# so there is no N+1. Contact fields are read by traversal, not projected onto
+# Person — the deliberate shift from the old population/mirror model.
 - name: HubSpotContact
   parents: [Contact]
   visibility: internal
-  description: "A HubSpot CRM contact, mirrored into the KG and resolved onto a canonical Person by email."
-  userAnchor:
-    predicate: OWNED_BY
-    direction: from-user
+  userAnchor: false
+  description: "A HubSpot CRM contact, fetched on demand and linked to a canonical Person by email."
+  virtualJoins:
+    - anchorLabel: Person
+      relationship: HAS_HUBSPOT_CONTACT
+      keyField: email          # Person.email
+      recordKeyField: email    # contact record's email (id-match)
+      producer: contactsByEmail
   properties:
     email:
-      description: "Primary email — the deterministic merge key onto the canonical Person."
+      description: "Primary email — identity of the contact and the id-match key to Person."
       metadata:
         identity: "true"
-    jobtitle:
-      description: "Job title; projects onto the canonical Person, winner by host precedence then recency."
-      metadata:
-        canonical: "jobTitle"
-    company:
-      description: "Company name; resolved to an Organization and linked WORKS_FOR."
-      metadata:
-        relationship: "WORKS_FOR"
-        target: "Organization"
-        matchBy: "name"
+    jobtitle: "Job title."
+    company: "Company name as held in HubSpot."
     phone:
-      description: "Phone number; unioned across sources onto the canonical Person."
+      description: "Phone number(s)."
       cardinality: LIST
+
+# The ORGANIZATION analog — fetched on demand and linked to a canonical
+# :Organization by DOMAIN (id-match Organization.domain == company.domain),
+# batched by the `companiesByDomain` producer.
+- name: HubSpotCompany
+  visibility: internal
+  userAnchor: false
+  description: "A HubSpot CRM company, fetched on demand and linked to a canonical Organization by domain."
+  virtualJoins:
+    - anchorLabel: Organization
+      relationship: HAS_HUBSPOT_COMPANY
+      keyField: domain         # Organization.domain
+      recordKeyField: domain   # company record's domain (id-match)
+      producer: companiesByDomain
+  properties:
+    domain:
+      description: "Primary web domain — identity of the company and the id-match key to Organization."
       metadata:
-        canonical: "phones"
-        multivalued: "true"
+        identity: "true"
+    name: "Company name."
+    industry: "Industry."
+    website: "Company website."
