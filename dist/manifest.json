@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "generatedAt": "2026-06-23T06:01:53.254Z",
+  "entries": [
+    {
+      "namespace": "company",
+      "name": "hasDomain",
+      "description": "Whether the company has a usable web domain (its identity / update key).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "boolean"
+      },
+      "onType": "HubSpotCompany",
+      "className": "HubSpotCompany"
+    },
+    {
+      "namespace": "company",
+      "name": "neighbors",
+      "description": "Who/what this entity is connected to, related to, or works with in the knowledge graph. Inherited by every pack type, so a new type is graph- navigable for free. Walks outward `hops` (1–3, default 1); optionally filter relationship types (CSV) and cap with `limit`. Returns the connected nodes nearest-first; empty if this node isn't persisted yet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hops": {
+            "type": "number"
+          },
+          "relTypes": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "hops": {
+              "type": "number"
+            },
+            "relPath": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "hops"
+          ]
+        }
+      },
+      "onType": "HubSpotCompany",
+      "className": "HubSpotCompany"
+    },
+    {
+      "namespace": "company",
+      "name": "update",
+      "description": "Update company properties (addressed by domain).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "onType": "HubSpotCompany",
+      "className": "HubSpotCompany"
+    },
+    {
+      "namespace": "contact",
+      "name": "createFollowUpTask",
+      "description": "Create a follow-up task on the contact, due at `dueIso` (default: now).",
+      "inputSchema": {
+        "type": "string"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "daysSinceContacted",
+      "description": "Days since the contact was last contacted (any logged channel), or null if never.",
+      "inputSchema": {
+        "type": "number"
+      },
+      "outputSchema": {
+        "type": "number"
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "fullName",
+      "description": "Best display name from first/last, falling back to the email.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "string"
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "isStale",
+      "description": "Never contacted, or not contacted within `days` (default 30).",
+      "inputSchema": {
+        "type": "number"
+      },
+      "outputSchema": {
+        "type": "boolean"
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "logNote",
+      "description": "Log a note against the contact, associated to it.",
+      "inputSchema": {
+        "type": "string"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "needsFollowUp",
+      "description": "A contact this owner should follow up: stale past `days` (default 14).",
+      "inputSchema": {
+        "type": "number"
+      },
+      "outputSchema": {
+        "type": "boolean"
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "neighbors",
+      "description": "Who/what this entity is connected to, related to, or works with in the knowledge graph. Inherited by every pack type, so a new type is graph- navigable for free. Walks outward `hops` (1–3, default 1); optionally filter relationship types (CSV) and cap with `limit`. Returns the connected nodes nearest-first; empty if this node isn't persisted yet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hops": {
+            "type": "number"
+          },
+          "relTypes": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "hops": {
+              "type": "number"
+            },
+            "relPath": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "hops"
+          ]
+        }
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "reassignOwner",
+      "description": "Reassign the contact to a different owner (by numeric owner id).",
+      "inputSchema": {
+        "type": "string"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "contact",
+      "name": "update",
+      "description": "Update contact properties (addressed by email, no id lookup needed).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "onType": "HubSpotContact",
+      "className": "HubSpotContact"
+    },
+    {
+      "namespace": "owner",
+      "name": "displayName",
+      "description": "Best display name from first/last, falling back to the email or owner id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "string"
+      },
+      "onType": "HubSpotOwner",
+      "className": "HubSpotOwner"
+    },
+    {
+      "namespace": "owner",
+      "name": "neighbors",
+      "description": "Who/what this entity is connected to, related to, or works with in the knowledge graph. Inherited by every pack type, so a new type is graph- navigable for free. Walks outward `hops` (1–3, default 1); optionally filter relationship types (CSV) and cap with `limit`. Returns the connected nodes nearest-first; empty if this node isn't persisted yet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hops": {
+            "type": "number"
+          },
+          "relTypes": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "hops": {
+              "type": "number"
+            },
+            "relPath": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "hops"
+          ]
+        }
+      },
+      "onType": "HubSpotOwner",
+      "className": "HubSpotOwner"
+    }
+  ]
+}

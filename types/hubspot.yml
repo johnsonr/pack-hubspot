@@ -23,12 +23,26 @@
   visibility: internal
   userAnchor: false
   description: "A HubSpot CRM contact, fetched on demand and linked to a canonical Person by email."
+  # Two ways in:
+  #  1. from a canonical Person, by email (read a known person's contact details);
+  #  2. from a HubSpotOwner, by owner id — "the contacts this owner owns", which is
+  #     how "my contacts" and "Jasper's contacts" resolve (anchor → owner → contacts).
+  #     "not emailed lately" then filters the recency fields below.
+  #
+  #   MATCH (p:Person) WHERE toLower(p.name) CONTAINS 'jasper'
+  #   MATCH (p)-[:HAS_HUBSPOT_OWNER]->(o:HubSpotOwner)-[:OWNS_CONTACT]->(c:HubSpotContact)
+  #   WHERE c.notes_last_contacted < '2026-05-01' RETURN c.email, c.notes_last_contacted
   virtualJoins:
     - anchorLabel: Person
       relationship: HAS_HUBSPOT_CONTACT
       keyField: email          # Person.email
       recordKeyField: email    # contact record's email (id-match)
       producer: contactsByEmail
+    - anchorLabel: HubSpotOwner
+      relationship: OWNS_CONTACT       # (o:HubSpotOwner)-[:OWNS_CONTACT]->(c) = contacts this owner owns
+      keyField: id                     # HubSpotOwner.id (the numeric owner id)
+      recordKeyField: hubspot_owner_id # contact record's owner id (id-match)
+      producer: contactsByOwner
   properties:
     email:
       description: "Primary email — identity of the contact and the id-match key to Person."
@@ -39,6 +53,9 @@
     phone:
       description: "Phone number(s)."
       cardinality: LIST
+    hubspot_owner_id: "Owner id (digits) — id-match key to HubSpotOwner; who in the CRM owns this contact."
+    notes_last_contacted: "ISO-8601 timestamp of the last logged contact (email/call/meeting). Compare lexically for 'not contacted since X'."
+    hs_last_sales_activity_timestamp: "ISO-8601 timestamp of the last sales activity on the contact."
 
 # The ORGANIZATION analog — fetched on demand and linked to a canonical
 # :Organization by DOMAIN (id-match Organization.domain == company.domain),
@@ -61,3 +78,33 @@
     name: "Company name."
     industry: "Industry."
     website: "Company website."
+
+# The OWNER / seller anchor — a HubSpot user records can be assigned to. It's the
+# identity that scopes "whose contacts": resolved from a canonical :Person by email
+# (Person.email == owner.email), so it works for the connecting user ("my contacts")
+# AND any colleague who is an owner in the same HubSpot org ("Jasper's contacts").
+# A named person who is NOT an owner in the connected org simply resolves to nothing
+# — there is no credentialed path to a different tenant, so the query honestly empties.
+#
+#   MATCH (me:AssistantUser)-[:HAS_PERSON]->(p:Person)-[:HAS_HUBSPOT_OWNER]->(o:HubSpotOwner)
+#   MATCH (o)-[:OWNS_CONTACT]->(c:HubSpotContact) RETURN c.email
+- name: HubSpotOwner
+  visibility: internal
+  userAnchor: false
+  description: "A HubSpot owner (CRM user/seller), resolved from a Person by email; the anchor for owner-scoped contact queries."
+  virtualJoins:
+    - anchorLabel: Person
+      relationship: HAS_HUBSPOT_OWNER
+      keyField: email          # Person.email
+      recordKeyField: email    # owner record's email (id-match)
+      producer: ownersByEmail
+      persist: true
+  properties:
+    id:
+      description: "Owner id (digits) — identity, and the key contacts filter by (hubspot_owner_id)."
+      metadata:
+        identity: "true"
+    email:
+      description: "Owner's email — the key resolved from the Person."
+    firstName: "Owner's first name."
+    lastName: "Owner's last name."

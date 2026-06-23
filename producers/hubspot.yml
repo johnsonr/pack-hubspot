@@ -37,3 +37,35 @@
   cache:
     kind: ttl
     seconds: 300
+
+# Resolve a Person to their HubSpot owner by email. `ownersList` (GET /crm/v3/owners)
+# has no IN filter, so this fetches the org's owners (a small set — they're CRM users)
+# and the join matches each record's `email` to the queried Person emails. The owner
+# record carries `id` (the numeric owner id contacts filter by) + `email`/`firstName`/
+# `lastName`, stored straight onto the HubSpotOwner node.
+- name: ownersByEmail
+  kind: api
+  operation: ownersList
+  records: "$.results[*]"
+  cache:
+    kind: ttl
+    seconds: 600
+
+# The contacts a given owner owns: search contacts where `hubspot_owner_id` is IN the
+# anchor owner ids. Returns the recency fields so "not emailed lately" filters them
+# (graph-side for now; a pushdown rule can scope it at the source later).
+- name: contactsByOwner
+  kind: api
+  operation: objectsSearch
+  records: "$.results[*].properties"
+  keyArg: "filterGroups.0.filters.0.values"
+  args:
+    objectType: contacts
+    properties: [email, firstname, lastname, jobtitle, phone, company, hubspot_owner_id, notes_last_contacted, hs_last_sales_activity_timestamp]
+    filterGroups:
+      - filters:
+          - propertyName: hubspot_owner_id
+            operator: IN
+  cache:
+    kind: ttl
+    seconds: 300
