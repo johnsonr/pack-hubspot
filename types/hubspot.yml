@@ -38,11 +38,13 @@
       keyField: email          # Person.email
       recordKeyField: email    # contact record's email (id-match)
       producer: contactsByEmail
+      description: "a Person's OWN CRM contact record, matched by email — NOT the contacts they own"
     - anchorLabel: HubSpotOwner
       relationship: OWNS_CONTACT       # (o:HubSpotOwner)-[:OWNS_CONTACT]->(c) = contacts this owner owns
       keyField: id                     # HubSpotOwner.id (the numeric owner id)
       recordKeyField: hubspot_owner_id # contact record's owner id (id-match)
       producer: contactsByOwner
+      description: "the contacts a CRM owner OWNS; for \"my contacts\" anchor the owner on (me:AssistantUser)-[:HAS_HUBSPOT_OWNER]->(:HubSpotOwner)"
   properties:
     email:
       description: "Primary email — identity of the contact and the id-match key to Person."
@@ -70,6 +72,7 @@
       keyField: domain         # Organization.domain
       recordKeyField: domain   # company record's domain (id-match)
       producer: companiesByDomain
+      description: "an Organization's OWN CRM company record, matched by domain"
   properties:
     domain:
       description: "Primary web domain — identity of the company and the id-match key to Organization."
@@ -99,6 +102,7 @@
       recordKeyField: email    # owner record's email (id-match)
       producer: ownersByEmail
       persist: true
+      description: "the CRM owner identity for a person (you, or a colleague who is an owner) — the anchor for owned-contact queries"
   properties:
     id:
       description: "Owner id (digits) — identity, and the key contacts filter by (hubspot_owner_id)."
