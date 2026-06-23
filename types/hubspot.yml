@@ -35,8 +35,9 @@
   virtualJoins:
     - anchorLabel: Person
       relationship: HAS_HUBSPOT_CONTACT
-      keyField: email          # Person.email
-      recordKeyField: email    # contact record's email (id-match)
+      keyField: primaryEmail   # Person.primaryEmail — the canonical Person email property
+                               # (a bare `email` is null on virtually every Person node).
+      recordKeyField: email    # contact record's email (id-match against Person.primaryEmail)
       producer: contactsByEmail
       description: "a Person's OWN CRM contact record, matched by email — NOT the contacts they own"
     - anchorLabel: HubSpotOwner
@@ -50,6 +51,8 @@
       description: "Primary email — identity of the contact and the id-match key to Person."
       metadata:
         identity: "true"
+    firstname: "Given name. HubSpot stores names as firstname/lastname — there is NO single `name` field; build a display name as `firstname + ' ' + lastname`."
+    lastname: "Family name. See firstname."
     jobtitle: "Job title."
     company: "Company name as held in HubSpot."
     phone:
@@ -98,10 +101,15 @@
   virtualJoins:
     - anchorLabel: Person
       relationship: HAS_HUBSPOT_OWNER
-      keyField: email          # Person.email
-      recordKeyField: email    # owner record's email (id-match)
+      keyField: primaryEmail   # anchor key for the pre-pass probe; the resolve chain owns the rest
+      recordKeyField: email    # owner record's email (id-match against the Person's canonical email)
       producer: ownersByEmail
-      persist: true
+      # Write-through identity bridge, resolved LAZILY for ANY person the query names (you OR a
+      # colleague), persisted + reused. The chain is tried in order, first match wins:
+      writeThrough: true
+      resolve:
+        - existingBridge                                  # respect a fresh HubSpotOwner already linked
+        - canonicalEmail: { producer: ownersByEmail }     # else resolve via the Person's email set
       description: "the CRM owner identity for a person (you, or a colleague who is an owner) — the anchor for owned-contact queries"
   properties:
     id:
