@@ -47,6 +47,10 @@
   kind: api
   operation: ownersList
   records: "$.results[*]"
+  cost:                  # one ownersList call covers all anchors → batchable + cheap bucket; the
+    bucket: hubspot      # optimizer resolves every anchor now (no deferral), unlike GitHub search
+    rate: 100/10s
+    batch: true
   cache:
     kind: ttl
     seconds: 600
