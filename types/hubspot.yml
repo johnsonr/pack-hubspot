@@ -54,33 +54,63 @@
     firstname: "Given name. HubSpot stores names as firstname/lastname — there is NO single `name` field; build a display name as `firstname + ' ' + lastname`."
     lastname: "Family name. See firstname."
     jobtitle: "Job title."
-    company: "Company name as held in HubSpot."
+    company:
+      description: "The contact's free-text `company` PROPERTY — frequently empty. A contact's PRIMARY COMPANY is usually a HubSpot ASSOCIATION (see associatedcompanyid), NOT this property, so this is often null even when a company is shown on the contact in HubSpot."
+      # Canonicalize the contact onto a commercial :Organization. The MERGE KEY is the contact's email
+      # DOMAIN (derived from `email` above), NOT this free text — so two contacts on the same corporate
+      # domain converge on ONE Organization regardless of how they spelled the company. This text only
+      # supplies the display NAME. A freemail/no-domain contact yields no Organization (by design — name
+      # alone never invents one). Result: `(c:HubSpotContact)-[:WORKS_FOR]->(o:Organization)`, so
+      # "my contacts' companies" / "contacts at (acme:Organization {name:'Acme'})" resolve to the shared
+      # canonical spine without a HubSpot-specific company walk.
+      metadata:
+        relationship: WORKS_FOR
+        target: Organization
+        matchBy: name
+    associatedcompanyid: "Id of the contact's PRIMARY associated company (a HubSpot association). Present when the contact is linked to a company even if the `company` text property above is empty; the company NAME requires resolving this id to a HubSpotCompany."
     phone:
-      description: "Phone number(s)."
+      description: "Phone number(s). Null when the contact has no phone set in HubSpot."
       cardinality: LIST
+    hs_lead_status: "Lead status (e.g. NEW, OPEN, IN_PROGRESS, OPEN_DEAL, CONNECTED, UNQUALIFIED). Often null when unset."
+    createdate: "ISO-8601 timestamp the contact was created in HubSpot (the CRM 'Create Date'). Compare lexically for 'created since X'."
+    notes_last_activity_date: "ISO-8601 timestamp of the contact's last activity of ANY kind (email, call, meeting, note, task). Broader than notes_last_contacted / hs_last_sales_activity_timestamp. Compare lexically for 'no activity since X'."
     hubspot_owner_id: "Owner id (digits) — id-match key to HubSpotOwner; who in the CRM owns this contact."
     notes_last_contacted: "ISO-8601 timestamp of the last logged contact (email/call/meeting). Compare lexically for 'not contacted since X'."
     hs_last_sales_activity_timestamp: "ISO-8601 timestamp of the last sales activity on the contact."
 
-# The ORGANIZATION analog — fetched on demand and linked to a canonical
-# :Organization by DOMAIN (id-match Organization.domain == company.domain),
-# batched by the `companiesByDomain` producer.
+# The ORGANIZATION analog — fetched on demand and reached two ways, both converging
+# (NORMALIZED) onto one node by the HubSpot object id (`hs_object_id`):
+#   1. from a canonical :Organization by DOMAIN (id-match Organization.domain == company.domain);
+#   2. from a :HubSpotContact by its PRIMARY-company association id (associatedcompanyid == hs_object_id) —
+#      this is how a contact gets its company NAME, since the contact's `company` text property is
+#      usually empty (the primary company is an association, not that property).
+# Identity is `hs_object_id` (always present, stable) — NOT `domain`, so a company with no web domain
+# still materializes and still dedupes. The same company reached from many contacts (and the canonical
+# Organization) is ONE node with many incoming edges.
 - name: HubSpotCompany
   visibility: internal
   userAnchor: false
-  description: "A HubSpot CRM company, fetched on demand and linked to a canonical Organization by domain."
+  description: "A HubSpot CRM company, fetched on demand. Reached from a canonical Organization by domain, and from a HubSpotContact by its primary-company association — both deduped onto one node by HubSpot object id."
   virtualJoins:
     - anchorLabel: Organization
       relationship: HAS_HUBSPOT_COMPANY
-      keyField: domain         # Organization.domain
-      recordKeyField: domain   # company record's domain (id-match)
+      keyField: domain          # Organization.domain
+      recordKeyField: domain    # company record's domain (id-match) — the LINK key (node identity is hs_object_id)
       producer: companiesByDomain
       description: "an Organization's OWN CRM company record, matched by domain"
+    - anchorLabel: HubSpotContact
+      relationship: HAS_PRIMARY_COMPANY     # (c:HubSpotContact)-[:HAS_PRIMARY_COMPANY]->(co) = the contact's primary company
+      keyField: associatedcompanyid         # the contact's primary-company association id
+      recordKeyField: hs_object_id          # company object id (id-match) — gives the company NAME for a contact
+      producer: companiesById
+      description: "the contact's PRIMARY associated company — use this for a contact's company NAME (co.name), since HubSpotContact.company is usually empty"
   properties:
-    domain:
-      description: "Primary web domain — identity of the company and the id-match key to Organization."
+    hs_object_id:
+      description: "HubSpot object id — identity of the company; the id a contact's associatedcompanyid points at."
       metadata:
         identity: "true"
+    domain:
+      description: "Primary web domain — the id-match key to a canonical Organization. May be empty for companies with no web domain."
     name: "Company name."
     industry: "Industry."
     website: "Company website."

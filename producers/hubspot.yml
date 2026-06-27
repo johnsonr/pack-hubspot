@@ -13,7 +13,7 @@
   keyArg: "filterGroups.0.filters.0.values"
   args:
     objectType: contacts
-    properties: [email, firstname, lastname, jobtitle, phone, company]
+    properties: [email, firstname, lastname, jobtitle, phone, company, associatedcompanyid, createdate, hs_lead_status, notes_last_activity_date, notes_last_contacted, hs_last_sales_activity_timestamp]
     filterGroups:
       - filters:
           - propertyName: email
@@ -29,10 +29,29 @@
   keyArg: "filterGroups.0.filters.0.values"
   args:
     objectType: companies
-    properties: [domain, name, industry, website, city, country]
+    properties: [hs_object_id, domain, name, industry, website, city, country]   # hs_object_id = node identity (dedup)
     filterGroups:
       - filters:
           - propertyName: domain
+            operator: IN
+  cache:
+    kind: ttl
+    seconds: 300
+
+# A company by its HubSpot OBJECT ID — resolves a contact's primary-company association
+# (HubSpotContact.associatedcompanyid) to the company record (and its NAME). Keyed on
+# `hs_object_id` IN […]; the node dedupes with the domain path on the same hs_object_id.
+- name: companiesById
+  kind: api
+  operation: objectsSearch
+  records: "$.results[*].properties"
+  keyArg: "filterGroups.0.filters.0.values"
+  args:
+    objectType: companies
+    properties: [hs_object_id, domain, name, industry, website, city, country]
+    filterGroups:
+      - filters:
+          - propertyName: hs_object_id
             operator: IN
   cache:
     kind: ttl
@@ -65,7 +84,7 @@
   keyArg: "filterGroups.0.filters.0.values"
   args:
     objectType: contacts
-    properties: [email, firstname, lastname, jobtitle, phone, company, hubspot_owner_id, notes_last_contacted, hs_last_sales_activity_timestamp]
+    properties: [email, firstname, lastname, jobtitle, phone, company, associatedcompanyid, createdate, hs_lead_status, notes_last_activity_date, hubspot_owner_id, notes_last_contacted, hs_last_sales_activity_timestamp]
     filterGroups:
       - filters:
           - propertyName: hubspot_owner_id
