@@ -51,6 +51,12 @@
       description: "Primary email — identity of the contact and the id-match key to Person."
       metadata:
         identity: "true"
+        # Opt IN to canonicalization: project contact records onto the canonical Person spine by email
+        # (and, via the `company` WORKS_FOR below, onto Organization). Required now that `identity: true`
+        # alone is node-identity only — without this hub the contact would never enrich a Person. The
+        # Person hub matches against the person's FULL email set (primaryEmail + emails[]), so a contact
+        # whose email is any one of the person's addresses still resolves to the one Person.
+        hub: Person
     firstname: "Given name. HubSpot stores names as firstname/lastname — there is NO single `name` field; build a display name as `firstname + ' ' + lastname`."
     lastname: "Family name. See firstname."
     jobtitle: "Job title."
